@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 
 	struct SwsContext *img_convert_ctx;
 
-	char filepath[]="ŒÅË¿ÄÐÊ¿.mov";
+    char* filepath=argv[1];
 
 	av_register_all();
 	avformat_network_init();
@@ -114,11 +114,11 @@ int main(int argc, char* argv[])
 	}
 	pFrame=av_frame_alloc();
 	pFrameYUV=av_frame_alloc();
-	out_buffer=(uint8_t *)av_malloc(avpicture_get_size(PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height));
-	avpicture_fill((AVPicture *)pFrameYUV, out_buffer, PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height);
+    out_buffer=(uint8_t *)av_malloc(avpicture_get_size(AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height));
+    avpicture_fill((AVPicture *)pFrameYUV, out_buffer, AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height);
 	
 	img_convert_ctx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt, 
-		pCodecCtx->width, pCodecCtx->height, PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL); 
+        pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
 	
 
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)) {  
