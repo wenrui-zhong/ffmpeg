@@ -27,8 +27,11 @@ extern "C"
 #include "libavformat/avformat.h"
 #include "libswscale/swscale.h"
 #include "SDL2/SDL.h"
+#include <sys/time.h>
+#include <unistd.h>
 };
 
+#define TIME_LOG 0
 
 //Refresh Event
 #define SFM_REFRESH_EVENT  (SDL_USEREVENT + 1)
@@ -54,10 +57,16 @@ int sfp_refresh_thread(void *opaque){
 	return 0;
 }
 
+static uint64_t now_us()
+{
+    struct timeval t;
+    memset(&t, 0, sizeof (t));
+    gettimeofday(&t, nullptr);
+    return t.tv_sec*1000000 + t.tv_usec;
+}
 
 int main(int argc, char* argv[])
 {
-
 	AVFormatContext	*pFormatCtx;
 	int				i, videoindex;
 	AVCodecContext	*pCodecCtx;
@@ -77,38 +86,44 @@ int main(int argc, char* argv[])
 	SDL_Event event;
 
 	struct SwsContext *img_convert_ctx;
-
     char* filepath=argv[1];
 
 	av_register_all();
 	avformat_network_init();
 	pFormatCtx = avformat_alloc_context();
 
-	if(avformat_open_input(&pFormatCtx,filepath,NULL,NULL)!=0){
+    if(avformat_open_input(&pFormatCtx, filepath, NULL, NULL)!=0){
 		printf("Couldn't open input stream.\n");
 		return -1;
 	}
-	if(avformat_find_stream_info(pFormatCtx,NULL)<0){
+
+    if(avformat_find_stream_info(pFormatCtx, NULL)<0){
 		printf("Couldn't find stream information.\n");
 		return -1;
 	}
+
 	videoindex=-1;
-	for(i=0; i<pFormatCtx->nb_streams; i++) 
-		if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
-			videoindex=i;
-			break;
-		}
+    for(i=0; i<pFormatCtx->nb_streams; i++)
+    {
+        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
+            videoindex=i;
+            break;
+        }
+    }
+
 	if(videoindex==-1){
 		printf("Didn't find a video stream.\n");
 		return -1;
 	}
+
 	pCodecCtx=pFormatCtx->streams[videoindex]->codec;
 	pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
 	if(pCodec==NULL){
 		printf("Codec not found.\n");
 		return -1;
 	}
-	if(avcodec_open2(pCodecCtx, pCodec,NULL)<0){
+
+    if(avcodec_open2(pCodecCtx, pCodec,NULL)<0){
 		printf("Could not open codec.\n");
 		return -1;
 	}
@@ -120,7 +135,6 @@ int main(int argc, char* argv[])
 	img_convert_ctx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt, 
         pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
 	
-
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)) {  
 		printf( "Could not initialize SDL - %s\n", SDL_GetError()); 
 		return -1;
@@ -150,41 +164,54 @@ int main(int argc, char* argv[])
 	video_tid = SDL_CreateThread(sfp_refresh_thread,NULL,NULL);
 	//------------SDL End------------
 	//Event Loop
-	
-	for (;;) {
-		//Wait
-		SDL_WaitEvent(&event);
-		if(event.type==SFM_REFRESH_EVENT){
-			//------------------------------
-			if(av_read_frame(pFormatCtx, packet)>=0){
-				if(packet->stream_index==videoindex){
+
+    float fps = pFormatCtx->streams[videoindex]->avg_frame_rate.num/pFormatCtx->streams[videoindex]->avg_frame_rate.den;
+
+    printf("FPS:%f\n", fps);
+
+    while(1)
+    {
+        SDL_PollEvent(&event);
+
+        if(event.type==SFM_REFRESH_EVENT)
+        {
+            if(av_read_frame(pFormatCtx, packet)>=0)
+            {
+                if(packet->stream_index==videoindex)
+                {
 					ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
-					if(ret < 0){
+                    if(ret < 0)
+                    {
 						printf("Decode Error.\n");
 						return -1;
 					}
-					if(got_picture){
+                    if(got_picture)
+                    {
 						sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame->data, pFrame->linesize, 0, pCodecCtx->height, pFrameYUV->data, pFrameYUV->linesize);
-						//SDL---------------------------
+                        //SDL---------------------------
 						SDL_UpdateTexture( sdlTexture, NULL, pFrameYUV->data[0], pFrameYUV->linesize[0] );  
 						SDL_RenderClear( sdlRenderer );  
 						//SDL_RenderCopy( sdlRenderer, sdlTexture, &sdlRect, &sdlRect );  
-						SDL_RenderCopy( sdlRenderer, sdlTexture, NULL, NULL);  
+                        SDL_RenderCopy( sdlRenderer, sdlTexture, NULL, NULL);
 						SDL_RenderPresent( sdlRenderer );  
-						//SDL End-----------------------
+                        //SDL End-----------------------
 					}
 				}
 				av_free_packet(packet);
-			}else{
+            }else
+            {
 				//Exit Thread
 				thread_exit=1;
 			}
-		}else if(event.type==SDL_QUIT){
+        }
+        else if(event.type==SDL_QUIT)
+        {
 			thread_exit=1;
-		}else if(event.type==SFM_BREAK_EVENT){
+        }
+        else if(event.type==SFM_BREAK_EVENT)
+        {
 			break;
 		}
-
 	}
 
 	sws_freeContext(img_convert_ctx);

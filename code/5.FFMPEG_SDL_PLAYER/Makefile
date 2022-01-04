@@ -9,7 +9,7 @@ all:player
 
 
 player:
-	gcc simplest_ffmpeg_player_su.cpp -I /usr/local/ffmpeg/include/ $(LIB) -o $@
+	gcc -g simplest_ffmpeg_player_su.cpp -I /usr/local/ffmpeg/include/ $(LIB) -o $@
 
 clean:
-	rm *.o player
+	rm -f player
