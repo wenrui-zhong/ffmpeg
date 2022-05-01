@@ -1,0 +1,23 @@
+cmake_minimum_required(VERSION 3.5)
+
+project(test)
+
+# Add an executable with the above sources
+add_executable(test_123
+    main.c
+)
+
+set(AVFORMAT_LIBRARY /home/zhong/ffmpeg_build/lib/)
+
+target_include_directories(test_123
+    PRIVATE
+        /home/zhong/ffmpeg_build/include/
+)
+
+find_library( AVFORMAT_LIBRARY avformat )
+
+# link the library target
+target_link_libraries(test_123
+    PRIVATE 
+    	${AVFORMAT_LIBRARY} avformat
+)
