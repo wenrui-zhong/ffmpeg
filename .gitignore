@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# media fils is too large to uplaod to github
+*.mp4
+*.ts
