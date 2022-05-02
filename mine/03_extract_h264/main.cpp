@@ -98,6 +98,8 @@ int main(int argc, char** argv)
 
     // 'Note': If you convert the output ts file, set a filter for it
 
+    // FIXME: but how to check the h264 type?
+
 #if NOT_TS_FILE
     ///<  'MP4' --> 'Annex B'
     {
